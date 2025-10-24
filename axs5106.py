@@ -30,6 +30,7 @@ __version__ = "0.0.0+auto.0"
 __repo__ = "https://github.com/natheihei/CircuitPython_AXS5106.git"
 
 import time
+
 import digitalio
 from adafruit_bus_device.i2c_device import I2CDevice
 from micropython import const
@@ -52,22 +53,21 @@ class AXS5106L:
     A driver for the AXS5106L capacitive touch controller.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         i2c,
+        *,
         address=_AXS5106L_DEFAULT_I2C_ADDR,
-        debug=False,
         reset_pin=None,
         rotation=0,
-        width=None,
-        height=None,
+        dimensions=None,
+        **kwargs,
     ):
         """
         Initialize the AXS5106L touch controller.
 
         :param i2c: The I2C bus object
         :param address: I2C address (default 0x63)
-        :param debug: Enable debug output
         :param reset_pin: Optional reset pin (digitalio.DigitalInOut)
         :param rotation: Screen rotation (0-7). All 8 possible orientations:
             0: 0° (no rotation, no flip) - (x, y)
@@ -78,15 +78,20 @@ class AXS5106L:
             5: 90° CW + flip X (= 270° CW + flip Y) - (y, x)
             6: 270° CW (= 90° CCW) - (width-1-y, height-1-x)
             7: 270° CW + flip X (= 90° CW + flip Y) - (width-1-y, x)
-        :param width: Screen width in pixels (required for rotation transformations)
-        :param height: Screen height in pixels (required for rotation transformations)
+        :param dimensions: Tuple of (width, height) in pixels for rotation transformations
+        :param kwargs: Additional options (debug, width, height for backward compatibility)
         """
         self._i2c = I2CDevice(i2c, address)
-        self._debug = debug
+        self._debug = kwargs.get("debug", False)
         self._reset_pin = reset_pin
         self._rotation = rotation
-        self._width = width
-        self._height = height
+
+        # Handle dimensions - prioritize dimensions tuple, fall back to width/height kwargs
+        if dimensions is not None:
+            self._width, self._height = dimensions
+        else:
+            self._width = kwargs.get("width")
+            self._height = kwargs.get("height")
 
         # Perform hardware reset if reset pin is provided
         if self._reset_pin is not None:
@@ -158,33 +163,19 @@ class AXS5106L:
         w = self._width if self._width is not None else 0
         h = self._height if self._height is not None else 0
 
-        if self._rotation == 0:
-            # 0°: No transformation (x, y)
-            return (raw_x, raw_y)
-        elif self._rotation == 1:
-            # 0° flip X: (width-1-x, y)
-            return (w - 1 - raw_x if w > 0 else raw_x, raw_y)
-        elif self._rotation == 2:
-            # 0° flip Y: (x, height-1-y)
-            return (raw_x, h - 1 - raw_y if h > 0 else raw_y)
-        elif self._rotation == 3:
-            # 180° (flip both): (width-1-x, height-1-y)
-            return (w - 1 - raw_x if w > 0 else raw_x, h - 1 - raw_y if h > 0 else raw_y)
-        elif self._rotation == 4:
-            # 90° CW: (height-1-y, x)
-            return (h - 1 - raw_y if h > 0 else raw_y, raw_x)
-        elif self._rotation == 5:
-            # 90° CW + flip X (swap x,y): (y, x)
-            return (raw_y, raw_x)
-        elif self._rotation == 6:
-            # 270° CW (90° CCW): (width-1-y, height-1-x)
-            return (w - 1 - raw_y if w > 0 else raw_y, h - 1 - raw_x if h > 0 else raw_x)
-        elif self._rotation == 7:
-            # 270° CW + flip X: (width-1-y, x)
-            return (w - 1 - raw_y if w > 0 else raw_y, raw_x)
-        else:
-            # Fallback (should never reach here)
-            return (raw_x, raw_y)
+        # Rotation transformation mapping
+        transformations = {
+            0: (raw_x, raw_y),  # 0°: No transformation
+            1: (w - 1 - raw_x if w > 0 else raw_x, raw_y),  # 0° flip X
+            2: (raw_x, h - 1 - raw_y if h > 0 else raw_y),  # 0° flip Y
+            3: (w - 1 - raw_x if w > 0 else raw_x, h - 1 - raw_y if h > 0 else raw_y),  # 180°
+            4: (h - 1 - raw_y if h > 0 else raw_y, raw_x),  # 90° CW
+            5: (raw_y, raw_x),  # 90° CW + flip X
+            6: (w - 1 - raw_y if w > 0 else raw_y, h - 1 - raw_x if h > 0 else raw_x),  # 270° CW
+            7: (w - 1 - raw_y if w > 0 else raw_y, raw_x),  # 270° CW + flip X
+        }
+
+        return transformations.get(self._rotation, (raw_x, raw_y))
 
     def _read(self, register, length) -> bytearray:
         """Returns an array of 'length' bytes from the 'register'"""

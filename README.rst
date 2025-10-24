@@ -103,7 +103,7 @@ Usage Example
 
     # Initialize the touch controller with rotation and screen dimensions
     # rotation=4 is 90° clockwise, adjust based on your display orientation
-    touch = AXS5106L(i2c, reset_pin=reset, rotation=4, width=320, height=240)
+    touch = AXS5106L(i2c, reset_pin=reset, rotation=4, dimensions=(320, 240))
 
     # Main loop
     while True:
