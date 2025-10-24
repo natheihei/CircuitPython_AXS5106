@@ -89,8 +89,30 @@ Or the following command to update an existing version:
 Usage Example
 =============
 
-.. todo:: Add a quick, simple example. It and other examples should live in the
-examples folder and be included in docs/examples.rst.
+.. code-block:: python
+
+    import board
+    import digitalio
+    from axs5106 import AXS5106L
+
+    # Initialize I2C bus
+    i2c = board.I2C()
+
+    # Initialize reset pin
+    reset = digitalio.DigitalInOut(board.TOUCH_RST)
+
+    # Initialize the touch controller with rotation and screen dimensions
+    # rotation=4 is 90° clockwise, adjust based on your display orientation
+    touch = AXS5106L(i2c, reset_pin=reset, rotation=4, width=320, height=240)
+
+    # Main loop
+    while True:
+        # Check if screen is being touched
+        if touch.touched:
+            # Get all touch points (supports up to 5 simultaneous touches)
+            points = touch.touches
+            for point in points:
+                print(f"Touch {point['id']}: X={point['x']}, Y={point['y']}")
 
 Documentation
 =============
